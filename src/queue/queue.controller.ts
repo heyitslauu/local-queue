@@ -29,7 +29,7 @@ export class QueueController {
 
   @Get()
   getAllQueues(@Query('counterType') counterType?: CounterType) {
-    return this.queueService.getAllQueues(counterType);
+    return this.queueService.getDisplayState(counterType);
   }
 
   @Get('next')
