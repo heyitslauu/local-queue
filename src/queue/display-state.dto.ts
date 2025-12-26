@@ -7,6 +7,6 @@ export interface ServiceStatus {
 
 export interface DisplayState {
   services: ServiceStatus[];
-  waitingCount: number;
+  waiting: string[];
   updatedAt: string;
 }

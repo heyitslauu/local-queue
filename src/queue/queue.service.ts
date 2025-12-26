@@ -92,13 +92,13 @@ export class QueueService {
       };
     });
 
-    const waitingCount = filteredQueues.filter(
-      (item) => item.status === QueueStatus.WAITING,
-    ).length;
+    const waiting = filteredQueues
+      .filter((item) => item.status === QueueStatus.WAITING)
+      .map((item) => item.id);
 
     return {
       services,
-      waitingCount,
+      waiting,
       updatedAt: new Date().toISOString(),
     };
   }
@@ -112,9 +112,9 @@ export class QueueService {
       .filter((item) => item.status === QueueStatus.SERVING)
       .map((item) => item.id);
 
-    const waitingCount = queues.filter(
-      (item) => item.status === QueueStatus.WAITING,
-    ).length;
+    const waiting = queues
+      .filter((item) => item.status === QueueStatus.WAITING)
+      .map((item) => item.id);
 
     return {
       services: [
@@ -123,7 +123,7 @@ export class QueueService {
           serving,
         },
       ],
-      waitingCount,
+      waiting,
       updatedAt: new Date().toISOString(),
     };
   }
