@@ -13,6 +13,19 @@ export const counterTypeEnum = pgEnum('counter_type', [
   'CASHIER',
 ]);
 
+// Users table
+export const users = pgTable('users', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: varchar('email', { length: 255 }).notNull().unique(),
+  password: varchar('password', { length: 255 }).notNull(),
+  counterType: counterTypeEnum('counter_type').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+
 // Queues table
 export const queues = pgTable('queues', {
   uuid: uuid('uuid').primaryKey().defaultRandom(),
