@@ -43,7 +43,7 @@ export class QueueController {
     const next = this.queueService.getNext(counterType);
     if (!next) {
       throw new HttpException(
-        `No waiting queues available for ${counterType}`,
+        `No waiting queues available for ${counterType} or counter is already serving`,
         HttpStatus.NOT_FOUND,
       );
     }
