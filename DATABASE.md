@@ -1,4 +1,4 @@
-# Queue Backend - Database Setup
+# Queue Backend - Database Setup with Drizzle ORM
 
 ## PostgreSQL with Docker Compose
 
@@ -35,7 +35,41 @@ docker-compose down -v
 
 These settings can be changed in `.env` file.
 
-### Running the Application
+## Drizzle ORM Setup
+
+### Generate Migrations
+
+```bash
+# Generate migration files from schema
+npm run db:generate
+```
+
+### Push Schema to Database (Development)
+
+```bash
+# Push schema changes directly to database without migrations
+npm run db:push
+```
+
+This is the easiest way for development - it will create/update tables based on your schema.
+
+### Run Migrations (Production)
+
+```bash
+# Apply migrations to database
+npm run db:migrate
+```
+
+### Drizzle Studio
+
+```bash
+# Open Drizzle Studio (database GUI)
+npm run db:studio
+```
+
+Access at: https://local.drizzle.studio
+
+## Running the Application
 
 1. Start PostgreSQL:
 
@@ -43,22 +77,24 @@ These settings can be changed in `.env` file.
    docker-compose up -d
    ```
 
-2. Install dependencies (if not already done):
+2. Push schema to database (first time or after schema changes):
+
+   ```bash
+   npm run db:push
+   ```
+
+3. Install dependencies (if not already done):
 
    ```bash
    npm install
    ```
 
-3. Start the NestJS application:
+4. Start the NestJS application:
    ```bash
    npm run start:dev
    ```
 
-The application will automatically:
-
-- Connect to PostgreSQL
-- Create the `queues` table (synchronize: true)
-- Initialize counter IDs from existing data
+The application will automatically connect to PostgreSQL using Drizzle ORM.
 
 ### Accessing PostgreSQL Directly
 
@@ -69,12 +105,23 @@ docker exec -it queue-postgres psql -U queue_user -d queue_db
 # Common queries
 SELECT * FROM queues;
 SELECT * FROM queues WHERE status = 'SERVING';
-SELECT * FROM queues WHERE "counterType" = 'BILLING';
+SELECT * FROM queues WHERE counter_type = 'BILLING';
 ```
+
+## Schema
+
+The `queues` table has the following structure:
+
+- `uuid` - Primary key (UUID)
+- `id` - Unique queue identifier (e.g., "BILLING-001")
+- `counter_type` - Enum: BILLING, LAB, CASHIER
+- `status` - Enum: WAITING, SERVING, DONE
+- `created_at` - Timestamp
+- `updated_at` - Timestamp
 
 ### Production Notes
 
-- Set `synchronize: false` in `app.module.ts` for production
-- Use TypeORM migrations instead of synchronize
-- Use environment variables for database credentials
+- Use `npm run db:generate` to create migrations
+- Use `npm run db:migrate` to apply migrations in production
+- Avoid using `db:push` in production (it's for development only)
 - Consider setting up database backups
