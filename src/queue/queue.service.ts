@@ -1,11 +1,9 @@
 import { Injectable, forwardRef, Inject } from '@nestjs/common';
-import { eq, and, desc, asc } from 'drizzle-orm';
 import { QueueStatus } from './queue-status.enum';
 import { CounterType } from './counter-type.enum';
 import { QueueGateway } from './queue.gateway';
 import { DisplayState, ServiceStatus } from './display-state.dto';
-import { DATABASE } from '../db/database.module';
-import { queues } from '../db/schema';
+import { QueueRepository } from './queue.repository';
 
 export interface QueueItem {
   id: string;
@@ -22,7 +20,7 @@ export class QueueService {
   private initialized = false;
 
   constructor(
-    @Inject(DATABASE) private readonly db: any,
+    private readonly queueRepository: QueueRepository,
     @Inject(forwardRef(() => QueueGateway))
     private queueGateway: QueueGateway,
   ) {}
@@ -32,15 +30,11 @@ export class QueueService {
 
     // Initialize counter IDs from database
     for (const counterType of Object.values(CounterType)) {
-      const result = await this.db
-        .select()
-        .from(queues)
-        .where(eq(queues.counterType, counterType))
-        .orderBy(desc(queues.createdAt))
-        .limit(1);
+      const latestQueue =
+        await this.queueRepository.findLatestByCounterType(counterType);
 
-      if (result.length > 0) {
-        const match = result[0].id.match(/\d+$/);
+      if (latestQueue) {
+        const match = latestQueue.id.match(/\d+$/);
         const lastNumber = match ? parseInt(match[0], 10) : 0;
         this.counterIds.set(counterType, lastNumber);
       } else {
@@ -60,14 +54,11 @@ export class QueueService {
 
     const queueId = `${counterType}-${String(nextId).padStart(3, '0')}`;
 
-    const [saved] = await this.db
-      .insert(queues)
-      .values({
-        id: queueId,
-        counterType: counterType,
-        status: 'WAITING',
-      })
-      .returning();
+    const saved = await this.queueRepository.create({
+      id: queueId,
+      counterType: counterType,
+      status: 'WAITING',
+    });
 
     const queueItem: QueueItem = {
       id: saved.id,
@@ -82,23 +73,18 @@ export class QueueService {
   }
 
   async getNext(counterType: CounterType): Promise<QueueItem | null> {
-    // Check if THIS SPECIFIC counter is already locked (another request in progress for this counter)
+    // Check if THIS SPECIFIC counter is already locked
     const isCounterLocked = this.locks.get(counterType) === true;
     if (isCounterLocked) {
-      return null; // This specific counter is busy processing another request
+      return null;
     }
 
     // Check if THIS SPECIFIC counter already has a queue being served
-    const alreadyServing = await this.db
-      .select()
-      .from(queues)
-      .where(
-        and(eq(queues.counterType, counterType), eq(queues.status, 'SERVING')),
-      )
-      .limit(1);
+    const alreadyServing =
+      await this.queueRepository.findServingByCounterType(counterType);
 
-    if (alreadyServing.length > 0) {
-      return null; // This counter is already serving someone, must finish first
+    if (alreadyServing) {
+      return null;
     }
 
     // Acquire lock for THIS SPECIFIC counter only
@@ -106,29 +92,14 @@ export class QueueService {
 
     try {
       // Find next waiting queue for THIS SPECIFIC counter type
-      const nextItems = await this.db
-        .select()
-        .from(queues)
-        .where(
-          and(
-            eq(queues.counterType, counterType),
-            eq(queues.status, 'WAITING'),
-          ),
-        )
-        .orderBy(asc(queues.createdAt))
-        .limit(1);
+      const nextItem =
+        await this.queueRepository.findNextWaitingByCounterType(counterType);
 
-      if (nextItems.length > 0) {
-        const nextItem = nextItems[0];
-
-        const [updated] = await this.db
-          .update(queues)
-          .set({
-            status: 'SERVING',
-            updatedAt: new Date(),
-          })
-          .where(eq(queues.uuid, nextItem.uuid))
-          .returning();
+      if (nextItem) {
+        const updated = await this.queueRepository.updateStatus(
+          nextItem.uuid,
+          QueueStatus.SERVING,
+        );
 
         const queueItem: QueueItem = {
           id: updated.id,
@@ -150,21 +121,13 @@ export class QueueService {
   }
 
   async finish(id: string): Promise<QueueItem | null> {
-    const items = await this.db
-      .select()
-      .from(queues)
-      .where(eq(queues.id, id))
-      .limit(1);
+    const item = await this.queueRepository.findById(id);
 
-    if (items.length > 0) {
-      const [updated] = await this.db
-        .update(queues)
-        .set({
-          status: 'DONE',
-          updatedAt: new Date(),
-        })
-        .where(eq(queues.uuid, items[0].uuid))
-        .returning();
+    if (item) {
+      const updated = await this.queueRepository.updateStatus(
+        item.uuid,
+        QueueStatus.DONE,
+      );
 
       const queueItem: QueueItem = {
         id: updated.id,
@@ -182,23 +145,18 @@ export class QueueService {
 
   async getAllQueues(counterType?: CounterType): Promise<any[]> {
     if (counterType) {
-      return this.db
-        .select()
-        .from(queues)
-        .where(eq(queues.counterType, counterType));
+      return this.queueRepository.findByCounterType(counterType);
     }
-    return this.db.select().from(queues);
+    return this.queueRepository.findAll();
   }
 
   async getDisplayState(counterType?: CounterType): Promise<DisplayState> {
     let filteredQueues;
     if (counterType) {
-      filteredQueues = await this.db
-        .select()
-        .from(queues)
-        .where(eq(queues.counterType, counterType));
+      filteredQueues =
+        await this.queueRepository.findByCounterType(counterType);
     } else {
-      filteredQueues = await this.db.select().from(queues);
+      filteredQueues = await this.queueRepository.findAll();
     }
 
     const counterTypesToShow = counterType
@@ -232,10 +190,8 @@ export class QueueService {
   async getDisplayStateByCounter(
     counterType: CounterType,
   ): Promise<DisplayState> {
-    const queuesList = await this.db
-      .select()
-      .from(queues)
-      .where(eq(queues.counterType, counterType));
+    const queuesList =
+      await this.queueRepository.findByCounterType(counterType);
 
     const serving = queuesList
       .filter((item: any) => item.status === 'SERVING')
