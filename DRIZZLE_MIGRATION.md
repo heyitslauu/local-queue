@@ -47,5 +47,6 @@ The `queues` table includes:
 - `npm run db:generate` - Generate migrations
 - `npm run db:migrate` - Run migrations (production)
 - `npm run db:studio` - Open Drizzle Studio GUI
+- `npx drizzle-kit generate --name custom_migration_name`
 
 All existing API endpoints and WebSocket functionality remain unchanged!

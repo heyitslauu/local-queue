@@ -1,25 +1,31 @@
 import { Module, Global } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { drizzle } from 'drizzle-orm/postgres-js';
+import {
+  getDatabaseConfig,
+  DATABASE_CONNECTION,
+} from 'src/config/database.config';
 import postgres from 'postgres';
 import * as schema from './schema';
 
-export const DATABASE = Symbol('DATABASE');
-
-@Global()
 @Module({
   providers: [
     {
-      provide: DATABASE,
+      provide: DATABASE_CONNECTION,
       useFactory: (configService: ConfigService) => {
-        const connectionString = `postgres://${configService.get('DATABASE_USER')}:${configService.get('DATABASE_PASSWORD')}@${configService.get('DATABASE_HOST')}:${configService.get('DATABASE_PORT')}/${configService.get('DATABASE_NAME')}`;
+        const dbConfig = getDatabaseConfig(configService);
 
-        const client = postgres(connectionString);
+        const connectionString = `postgresql://${dbConfig.user}:${dbConfig.password}@${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`;
+
+        const client = postgres(connectionString, {
+          ssl: dbConfig.ssl,
+        });
+
         return drizzle(client, { schema });
       },
       inject: [ConfigService],
     },
   ],
-  exports: [DATABASE],
+  exports: [DATABASE_CONNECTION],
 })
 export class DatabaseModule {}
