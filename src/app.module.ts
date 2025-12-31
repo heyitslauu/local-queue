@@ -4,6 +4,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { QueueModule } from './queue/queue.module';
 import { DatabaseModule } from './db/database.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { DatabaseModule } from './db/database.module';
       isGlobal: true,
     }),
     DatabaseModule,
+    AuthModule,
     QueueModule,
   ],
   controllers: [AppController],

@@ -8,9 +8,11 @@ import {
   Body,
   HttpException,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import { QueueService } from './queue.service';
 import { CounterType } from './counter-type.enum';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('queue')
 export class QueueController {
@@ -32,6 +34,7 @@ export class QueueController {
     return this.queueService.getDisplayState(counterType);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('next')
   getNext(@Query('counterType') counterType: CounterType) {
     if (!counterType || !Object.values(CounterType).includes(counterType)) {
@@ -50,6 +53,7 @@ export class QueueController {
     return next;
   }
 
+  @UseGuards(JwtAuthGuard)
   @Patch(':id/finish')
   finish(@Param('id') id: string) {
     const finished = this.queueService.finish(id);
